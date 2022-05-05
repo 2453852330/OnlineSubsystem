@@ -4,6 +4,7 @@
 #include "GISubsystemNet.h"
 
 #include "OnlineSubsystemUtils.h"
+#include "Interfaces/OnlineLeaderboardInterface.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -28,6 +29,11 @@ UGISubsystemNet::UGISubsystemNet()
 	OnDestroySessionCompleteDelegate = FOnDestroySessionCompleteDelegate::CreateUObject(this,&UGISubsystemNet::OnDestorySessionComplete_bind);
 	OnFindSessionsCompleteDelegate = FOnFindSessionsCompleteDelegate::CreateUObject(this,&UGISubsystemNet::OnFindSessionComplete_bind);
 	OnJoinSessionCompleteDelegate = FOnJoinSessionCompleteDelegate::CreateUObject(this,&UGISubsystemNet::OnJoinSessionComplete_bind);
+
+	// read firend list
+	OnReadFriendsListComplete = FOnReadFriendsListComplete::CreateUObject(this,&UGISubsystemNet::OnReadFriendListComplete_bind);
+	// query Achievement
+	OnQueryAchievementsCompleteDelegate = FOnQueryAchievementsCompleteDelegate::CreateUObject(this,&UGISubsystemNet::OnQueryAchievements_bind);
 }
 // create
 void UGISubsystemNet::CreateSession(bool bUseLAN , int ConnectNumbers)
@@ -108,13 +114,213 @@ void UGISubsystemNet::JoinSession()
 void UGISubsystemNet::GetSubsystemType()
 {
 	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
-	
 	if (OnlineSubsystem)
 	{
 		FName SubsystemName = OnlineSubsystem->GetSubsystemName();
 		UE_LOG(LogTemp,Warning,TEXT("SubsystemName = %s"),*SubsystemName.ToString());
 	}
 }
+// get player name ? steam  : yes
+void UGISubsystemNet::GetPlayerName()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if(OnlineSubsystem)
+	{
+		IOnlineIdentityPtr IdentityPtr = OnlineSubsystem->GetIdentityInterface();
+		if (IdentityPtr.IsValid())
+		{
+			FString PlayerNickName = IdentityPtr->GetPlayerNickname(0);
+			UE_LOG(LogTemp,Error,TEXT("Get Player Nick Name | playerNickName -> %s "),*PlayerNickName);
+		}
+	}
+}
+// get unique net id
+void UGISubsystemNet::GetUniqueNetIdFromInterface()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineIdentityPtr IdentityPtr = OnlineSubsystem->GetIdentityInterface();
+		if (IdentityPtr.IsValid())
+		{
+			TSharedPtr<const FUniqueNetId> UniqueNetId = IdentityPtr->GetUniquePlayerId(0);
+			UE_LOG(LogTemp,Warning,TEXT("Player Unique Net Id -> %s"),*UniqueNetId->ToString());
+		}
+	}
+}
+// show friends UI ? same to = shift+tab in steam
+void UGISubsystemNet::ShowFriendUI()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineExternalUIPtr ExternalUIPtr = OnlineSubsystem->GetExternalUIInterface();
+		if (ExternalUIPtr.IsValid())
+		{
+			bool Ret = ExternalUIPtr->ShowFriendsUI(0);
+			UE_LOG(LogTemp,Warning,TEXT("Show Friend Ui | Success -> %d"),Ret);
+		}
+	}
+}
+// show invite ui  ?  not work , always failed
+void UGISubsystemNet::ShowInviteUI()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineExternalUIPtr ExternalUIPtr = OnlineSubsystem->GetExternalUIInterface();
+		if (ExternalUIPtr.IsValid())
+		{
+			bool Ret = ExternalUIPtr->ShowInviteUI(0);
+			UE_LOG(LogTemp,Warning,TEXT("Show Invite Ui | Success -> %d"),Ret);
+		}
+	}
+}
+// show store ui ? not work , always failed
+void UGISubsystemNet::ShowStoreUI()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineExternalUIPtr ExternalUIPtr = OnlineSubsystem->GetExternalUIInterface();
+		if (ExternalUIPtr.IsValid())
+		{
+			FShowStoreParams ShowStoreParams;
+			bool Ret = ExternalUIPtr->ShowStoreUI(0,ShowStoreParams);
+			UE_LOG(LogTemp,Warning,TEXT("Show store Ui | Success -> %d"),Ret);
+		}
+	}
+}
+// read friend list 
+void UGISubsystemNet::ReadFriendList()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineFriendsPtr FriendsPtr = OnlineSubsystem->GetFriendsInterface();
+		if (FriendsPtr.IsValid())
+		{
+			FString FriendListName;
+			// bind delegate
+			FriendsPtr->ReadFriendsList(0,OUT FriendListName,OnReadFriendsListComplete);
+		}
+	}
+}
+
+// invite friend ? need a Friend list (FString)
+void UGISubsystemNet::GetFriendList()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineFriendsPtr FriendsPtr = OnlineSubsystem->GetFriendsInterface();
+		if (FriendsPtr.IsValid())
+		{
+			TArray<TSharedRef<FOnlineFriend>> Friends;
+			FriendsPtr->GetFriendsList(0,MyFriendListName ,OUT Friends);
+			UE_LOG(LogTemp,Warning,TEXT("Get Friend List | friends nums -> %d"),Friends.Num());
+			if (Friends.Num())
+			{
+				for (auto Item : Friends)
+				{
+					FString DisplayName = Item->GetDisplayName();
+					UE_LOG(LogTemp,Error,TEXT("Friend List | [ %s ]"),*DisplayName);
+				}
+			}
+		}
+	}
+}
+// get leader board
+void UGISubsystemNet::GetLeaderBoard()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineLeaderboardsPtr LeaderboardsPtr = OnlineSubsystem->GetLeaderboardsInterface();
+		if (LeaderboardsPtr.IsValid())
+		{
+			TArray<TSharedRef<const FUniqueNetId>> PlayerList;
+			FOnlineLeaderboardReadRef LeaderboardReadRef = MakeShareable(new FOnlineLeaderboardRead);
+			LeaderboardReadRef->LeaderboardName = MY_LEADERBOARD_NAME;
+			LeaderboardReadRef->SortedColumn = MY_STAT_NAME;
+			LeaderboardReadRef->ColumnMetadata.Add(FColumnMetaData(MY_STAT_NAME,EOnlineKeyValuePairDataType::Float));
+			LeaderboardReadRef->ReadState = EOnlineAsyncTaskState::NotStarted;
+			LeaderboardsPtr->ReadLeaderboards(OUT PlayerList,LeaderboardReadRef);
+			UE_LOG(LogTemp,Warning,TEXT("Get Leader Board | playerlist num : %d | data num : %d "),PlayerList.Num(),LeaderboardReadRef->Rows.Num());
+		}
+	}
+}
+// add leader board data
+void UGISubsystemNet::AddLeaderBoard()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineLeaderboardsPtr LeaderboardsPtr = OnlineSubsystem->GetLeaderboardsInterface();
+		IOnlineIdentityPtr IdentityPtr = OnlineSubsystem->GetIdentityInterface();
+		if (LeaderboardsPtr.IsValid())
+		{
+			LeaderboardsPtr->FlushLeaderboards(MY_SESSION_NAME);
+			FOnlineLeaderboardWrite LeaderboardWrite;
+			LeaderboardWrite.LeaderboardNames.Add(MY_LEADERBOARD_NAME);
+			LeaderboardWrite.SetFloatStat(MY_STAT_NAME,FMath::FRandRange(5.f,100.f));
+			TSharedPtr<const FUniqueNetId> NetID = IdentityPtr->GetUniquePlayerId(0);
+			LeaderboardsPtr->WriteLeaderboards(MY_SESSION_NAME,*NetID.Get(),LeaderboardWrite);
+		}
+	}
+}
+
+void UGISubsystemNet::QueryAchievements()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineAchievementsPtr AchievementsPtr = OnlineSubsystem->GetAchievementsInterface();
+		IOnlineIdentityPtr IdentityPtr = OnlineSubsystem->GetIdentityInterface();
+		if (AchievementsPtr.IsValid())
+		{
+			TSharedPtr<const FUniqueNetId> NetID = IdentityPtr->GetUniquePlayerId(0);
+			TArray<FOnlineAchievement> Achievements;
+			AchievementsPtr->QueryAchievements(*(NetID.Get()),OnQueryAchievementsCompleteDelegate);
+			UE_LOG(LogTemp,Warning,TEXT("ReadAchievements | find %d "),Achievements.Num());
+		}
+	}
+}
+
+// read Achievements 
+void UGISubsystemNet::ReadAchievements()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineAchievementsPtr AchievementsPtr = OnlineSubsystem->GetAchievementsInterface();
+		IOnlineIdentityPtr IdentityPtr = OnlineSubsystem->GetIdentityInterface();
+		if (AchievementsPtr.IsValid())
+		{
+			TSharedPtr<const FUniqueNetId> NetID = IdentityPtr->GetUniquePlayerId(0);
+			TArray<FOnlineAchievement> Achievements;
+			AchievementsPtr->GetCachedAchievements(*(NetID.Get()),OUT Achievements);
+			UE_LOG(LogTemp,Warning,TEXT("ReadAchievements | find %d "),Achievements.Num());
+		}
+	}
+}
+// reset achievements
+void UGISubsystemNet::ResetAchievements()
+{
+	IOnlineSubsystem * OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem)
+	{
+		IOnlineAchievementsPtr AchievementsPtr = OnlineSubsystem->GetAchievementsInterface();
+		IOnlineIdentityPtr IdentityPtr = OnlineSubsystem->GetIdentityInterface();
+		if (AchievementsPtr.IsValid())
+		{
+			TSharedPtr<const FUniqueNetId> NetID = IdentityPtr->GetUniquePlayerId(0);
+			AchievementsPtr->ResetAchievements(*(NetID.Get()));
+		}
+	}
+}
+
+// -------------------------------------------------------------------------------------------------------------------------------------
 
 // join session bind
 void UGISubsystemNet::OnJoinSessionComplete_bind(FName SessionName, EOnJoinSessionCompleteResult::Type EJSCR)
@@ -133,6 +339,18 @@ void UGISubsystemNet::OnJoinSessionComplete_bind(FName SessionName, EOnJoinSessi
 			PC->ClientTravel(TravelURL,ETravelType::TRAVEL_Absolute);
 		}
 	}
+}
+// read friend list from server bind
+void UGISubsystemNet::OnReadFriendListComplete_bind(int32 LocalUserNum, bool bWasSuccessful, const FString& ListName,
+	const FString& ErrorStr)
+{
+	UE_LOG(LogTemp,Error,TEXT("Read Friend List Result : %d  , Lsit Name : %s"),bWasSuccessful,*ListName);
+	MyFriendListName = ListName;
+}
+// query achievements bind
+void UGISubsystemNet::OnQueryAchievements_bind(const FUniqueNetId& UniqueNetId, const bool Success)
+{
+	UE_LOG(LogTemp,Warning,TEXT("QueryAchievementComplete -> Success : %d"),Success);
 }
 
 
