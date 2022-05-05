@@ -1,0 +1,1 @@
+D:\Epic\Engine\UE_4.26\Engine\Binaries\Win64\UE4Editor.exe F:\Net\Net.uproject -game -ResX=600 -ResY=480 -WinX=20 -WinY=40 -log
